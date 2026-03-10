@@ -1,13 +1,13 @@
 import com.google.gson.Gson;
 
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.Reader;
+import java.io.*;
 import java.util.*;
 
 public class JsonProcessor {
     private Map<String, Player> players = new HashMap<>();
-    private static final double K_BASE = 15.0;
+    private static final double K_BASE = 32.0;
+    private static final double FRAME_WON_PARAMETER = 400.0;
+    private static final double BREAK_MULTIPLIER = 25.0;
 
     public Map<String, Player> getPlayers() {
         return players;
@@ -42,23 +42,49 @@ public class JsonProcessor {
             }
     }
 
+    public double calculateGlobalBreakRate(List<Match> matches) {
+        int totalPlayerFrames = 0;
+        int total70PlusBreaks = 0;
+
+        for (Match match : matches) {
+            int framesPlayed = match.getPlayer1Score() + match.getPlayer2Score();
+
+            totalPlayerFrames += framesPlayed;
+
+            total70PlusBreaks += match.getBreaksPlayer1().stream().filter(b -> b >= 70).count();
+            total70PlusBreaks += match.getBreaksPlayer2().stream().filter(b -> b >= 70).count();
+        }
+
+        double globalRate = totalPlayerFrames == 0 ? 0 : (double) total70PlusBreaks / totalPlayerFrames;
+        System.out.printf("Global 70+ Break Rate: %.4f per player-frame\n", globalRate);
+        return globalRate;
+    }
+
     // process the sorted list of matches
     // for each match, if a player does not exist in the players set,
     // initialize a new player with the player's name and country using constructor,
     // and add the player to the players set
     public void processMatches(List<Match> matches) {
+        double globalBreakRate = calculateGlobalBreakRate(matches);
         for (Match match : matches) {
             String player1Name = match.getPlayer1();
             String player2Name = match.getPlayer2();
             String player1Country = match.getPlayer1Country();
             String player2Country = match.getPlayer2Country();
+            String date = match.getDate();
+            // if date is like "2023-04-01", fine
+            // if date is like "2024-05-05 - 05-06", take latest date "2024-05-06"
+            // essentially, combine first 5 characters and last 5 characters to get the latest date
+            date = date.substring(0, 5) + date.substring(date.length() - 5);
 
             if (!players.containsKey(player1Name)) {
                 Player player1 = new Player(player1Name, player1Country);
+                player1.addScoreDate(date, player1.getCurrentFormPoints());
                 players.put(player1Name, player1);
             }
             if (!players.containsKey(player2Name)) {
                 Player player2 = new Player(player2Name, player2Country);
+                player2.addScoreDate(date, player2.getCurrentFormPoints());
                 players.put(player2Name, player2);
             }
 
@@ -70,39 +96,141 @@ public class JsonProcessor {
             int player1Score = match.getPlayer1Score();
             int player2Score = match.getPlayer2Score();
             int bestOfFrames = match.getBestOfFrames();
+            // get how many 70+ breaks each player has
+            int player1Breaks70Plus = (int)match.getBreaksPlayer1().stream().filter(breakScore -> breakScore >= 70)
+                    .count();
+            int player2Breaks70Plus = (int)match.getBreaksPlayer2().stream().filter(breakScore -> breakScore >= 70)
+                    .count();
 
             // calculate expected score for player 1
-            double expectedScorePlayer1 = 1.0 / (1.0 + Math.pow(10.0, (player2Points - player1Points) / 400.0));
-            double expectedScorePlayer2 = 1.0 - expectedScorePlayer1;
-            int framesToWin = (bestOfFrames + 1) / 2;
-            expectedScorePlayer1 = expectedScorePlayer1 * framesToWin;
-            expectedScorePlayer2 = expectedScorePlayer2 * framesToWin;
-            // actual score for player 1
-//            double actualResultPlayer1 = (player1Score > player2Score) ? 1.0 : (player1Score == player2Score) ? 0.5 : 0.0;
-//            double actualResultPlayer2 = 1.0 - actualResultPlayer1;
-            double actualResultPlayer1 = (double)player1Score;
-            double actualResultPlayer2 = (double)player2Score;
-            // scale K by best of frames
-            double kScaled = K_BASE * Math.sqrt(bestOfFrames / 11.0);
-            // get points change for player 1 and player 2
-            double pointsChangePlayer1 = kScaled * (actualResultPlayer1 - expectedScorePlayer1);
-            double pointsChangePlayer2 = kScaled * (actualResultPlayer2 - expectedScorePlayer2);
+            // 1. Calculate Single-Frame Win Probability
+            // This predicts the chance of Player 1 winning any given frame
+            double expectedFrameProbP1 = 1.0 / (1.0 + Math.pow(Math.E, (player2Points - player1Points) / FRAME_WON_PARAMETER));
+            double expectedFrameProbP2 = 1.0 - expectedFrameProbP1;
+
+            // 2. Calculate Expected Frames Won
+            int totalFramesPlayed = player1Score + player2Score;
+            double expectedFramesP1 = expectedFrameProbP1 * totalFramesPlayed;
+            double expectedFramesP2 = expectedFrameProbP2 * totalFramesPlayed;
+
+            // 3. Base Points Change (Zero-Sum)
+            // Note: We don't need the Math.sqrt(bestOfFrames) scaling anymore.
+            // A longer match naturally has a higher totalFramesPlayed, which inherently scales the points change!
+            double pointsChangePlayer1 = K_BASE * (player1Score - expectedFramesP1);
+            double pointsChangePlayer2 = K_BASE * (player2Score - expectedFramesP2);
+
+            double expectedBreaksP1 = globalBreakRate * player1Score;
+            double expectedBreaksP2 = globalBreakRate * player2Score;
+
+            pointsChangePlayer1 += BREAK_MULTIPLIER * (player1Breaks70Plus - expectedBreaksP1);
+            pointsChangePlayer2 += BREAK_MULTIPLIER * (player2Breaks70Plus - expectedBreaksP2);
+            // add bonus for 70+ breaks, set as 400 * count / bestOfFrames
+//            pointsChangePlayer1 += 400.0 * player1Breaks70Plus / bestOfFrames;
+//            pointsChangePlayer2 += 400.0 * player2Breaks70Plus / bestOfFrames;
             // update players' points
             player1.setCurrentFormPoints(player1Points + pointsChangePlayer1);
             player2.setCurrentFormPoints(player2Points + pointsChangePlayer2);
+
+            // add score date for both players
+            player1.addScoreDate(date, player1.getCurrentFormPoints());
+            player2.addScoreDate(date, player2.getCurrentFormPoints());
         }
     }
 
     public static void main(String[] args) {
         JsonProcessor processor = new JsonProcessor();
+
+        // burn in with 2022-2023 season
+        List<Match> matches2022_2023 = processor.readMatchesFromJson("season_2022-2023.json");
+        processor.processMatches(matches2022_2023);
+        // save the players at this point into csv file "players_after_2022-2023.csv"
+        // with columns "name", "country", "currentFormPoints"
+        try (Writer writer = new FileWriter("players_after_2022-2023.csv")) {
+            writer.write("name,country,currentFormPoints\n");
+            for (Player player : processor.getPlayers().values()) {
+                writer.write(player.getName() + "," + player.getCountry() + "," + player.getCurrentFormPoints() + "\n");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        // store a hashmap of players and their points after 2022-2023 season for future use
+        Map<String, Double> playersPointsAfter2022_2023 = new HashMap<>();
+        for (Player player : processor.getPlayers().values()) {
+            playersPointsAfter2022_2023.put(player.getName(), player.getCurrentFormPoints());
+        }
+
+        // 2023-2024 season
         List<Match> matches2023_2024 = processor.readMatchesFromJson("season_2023-2024.json");
         processor.processMatches(matches2023_2024);
-        System.out.println("There are " + processor.getPlayers().size() + " unique players in the 2023-2024 season.");
-        System.out.println("Players in 2023-2024 season:");
+
+        // store a hashmap of players and their points after 2023-2024 season for future use
+        Map<String, Double> playersPointsAfter2023_2024 = new HashMap<>();
+        for (Player player : processor.getPlayers().values()) {
+            playersPointsAfter2023_2024.put(player.getName(), player.getCurrentFormPoints());
+        }
+
+        // 2024-2025 season
+        List<Match> matches2024_2025 = processor.readMatchesFromJson("season_2024-2025.json");
+        processor.processMatches(matches2024_2025);
+
+        // store a hashmap of players and their points after 2024-2025 season for future use
+        Map<String, Double> playersPointsAfter2024_2025 = new HashMap<>();
+        for (Player player : processor.getPlayers().values()) {
+            playersPointsAfter2024_2025.put(player.getName(), player.getCurrentFormPoints());
+        }
+
+        // 2025-2026 season
+        List<Match> matches2025_2026 = processor.readMatchesFromJson("season_2025-2026.json");
+        processor.processMatches(matches2025_2026);
+
+        // store a hashmap of players and their points after 2025-2026 season for future use
+        Map<String, Double> playersPointsAfter2025_2026 = new HashMap<>();
+        for (Player player : processor.getPlayers().values()) {
+            playersPointsAfter2025_2026.put(player.getName(), player.getCurrentFormPoints());
+        }
+
+
+        System.out.println("After processing 2025-2026 season:");
+        System.out.println("There are " + processor.getPlayers().size() + " unique players in total.");
+        System.out.println("Players after 2025-2026 season:");
         // print out players and their points, sorted by points from highest to lowest
         processor.getPlayers().values().stream()
                 .sorted(Comparator.comparingDouble(Player::getCurrentFormPoints).reversed())
                 .forEach(player -> System.out.println(player.getName() + " (" + player.getCountry() + "): " + player.getCurrentFormPoints()));
+
+        // write a file "players_final.csv" with columns "name", "country", "currentFormPointsAfter2022_2023", "currentFormPointsAfter2023_2024", "currentFormPointsAfter2024_2025", "currentFormPointsAfter2025_2026"
+        try (Writer writer = new FileWriter("players_final.csv")) {
+            writer.write("name,country,currentFormPointsAfter2022_2023,currentFormPointsAfter2023_2024,currentFormPointsAfter2024_2025,currentFormPointsAfter2025_2026\n");
+            for (Player player : processor.getPlayers().values()) {
+                String name = player.getName();
+                String country = player.getCountry();
+                double pointsAfter2022_2023 = playersPointsAfter2022_2023.getOrDefault(name, 0.0);
+                double pointsAfter2023_2024 = playersPointsAfter2023_2024.getOrDefault(name, 0.0);
+                double pointsAfter2024_2025 = playersPointsAfter2024_2025.getOrDefault(name, 0.0);
+                double pointsAfter2025_2026 = playersPointsAfter2025_2026.getOrDefault(name, 0.0);
+                writer.write(name + "," + country + "," + pointsAfter2022_2023 + "," + pointsAfter2023_2024 + "," + pointsAfter2024_2025 + "," + pointsAfter2025_2026 + "\n");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        // write a file to keep players' score history
+        // columns are "name", "country", "date", "score"
+        try (Writer writer = new FileWriter("players_score_history.csv")) {
+            writer.write("name,country,date,score\n");
+            for (Player player : processor.getPlayers().values()) {
+                String name = player.getName();
+                String country = player.getCountry();
+                for (ScoreDate scoreDate : player.getScoreHistory()) {
+                    String date = scoreDate.getDate();
+                    double score = scoreDate.getScore();
+                    writer.write(name + "," + country + "," + date + "," + score + "\n");
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
     }
 }

@@ -1,7 +1,23 @@
+import java.util.ArrayList;
+import java.util.List;
+
 public class Player{
     private String name;
     private String country;
     private double currentFormPoints;
+    private List<ScoreDate> scoreHistory = new ArrayList<>();
+
+    public List<ScoreDate> getScoreHistory() {
+        return scoreHistory;
+    }
+
+    public void addScoreDate(ScoreDate scoreDate) {
+        this.scoreHistory.add(scoreDate);
+    }
+
+    public void addScoreDate(String date, double score) {
+        this.scoreHistory.add(new ScoreDate(date, score));
+    }
 
     public Player(String name, String country){
         this.name = name;

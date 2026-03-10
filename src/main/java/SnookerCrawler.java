@@ -53,7 +53,7 @@ public class SnookerCrawler {
             for  (WebElement anchor : tournamentAnchors) {
                 String tournamentURL = anchor.getAttribute("href");
                 String tournamentName = anchor.getText();
-                if (!tournamentName.contains("Q School")){
+                if (!tournamentName.contains("Q School") && !tournamentName.contains("6-Reds")){
                     Tournament tournament = new Tournament();
                     tournament.setName(tournamentName);
                     tournament.setCuetrackerURL(tournamentURL);
@@ -184,17 +184,21 @@ public class SnookerCrawler {
     }
 
     public static void main(String[] args) {
-        SnookerCrawler crawler3 = new SnookerCrawler();
-        String urlCuetracker3 = "https://cuetracker.net/seasons/2023-2024";
-        crawler3.getDataFromSeason(crawler3, urlCuetracker3);
+//        SnookerCrawler crawler3 = new SnookerCrawler();
+//        String urlCuetracker3 = "https://cuetracker.net/seasons/2023-2024";
+//        crawler3.getDataFromSeason(crawler3, urlCuetracker3);
+//
+//        SnookerCrawler crawler = new SnookerCrawler();
+//        String urlCuetracker = "https://cuetracker.net/seasons/2024-2025";
+//        crawler.getDataFromSeason(crawler, urlCuetracker);
+//
+//        SnookerCrawler crawler2 = new SnookerCrawler();
+//        String urlCuetracker2 = "https://cuetracker.net/seasons/2025-2026";
+//        crawler2.getDataFromSeason(crawler2, urlCuetracker2);
 
-        SnookerCrawler crawler = new SnookerCrawler();
-        String urlCuetracker = "https://cuetracker.net/seasons/2024-2025";
-        crawler.getDataFromSeason(crawler, urlCuetracker);
-
-        SnookerCrawler crawler2 = new SnookerCrawler();
-        String urlCuetracker2 = "https://cuetracker.net/seasons/2025-2026";
-        crawler2.getDataFromSeason(crawler2, urlCuetracker2);
+        SnookerCrawler crawler4 = new SnookerCrawler();
+        String urlCuetracker4 = "https://cuetracker.net/seasons/2022-2023";
+        crawler4.getDataFromSeason(crawler4, urlCuetracker4);
 
 
     }
