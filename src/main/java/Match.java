@@ -7,6 +7,34 @@ public class Match{
     private int player1Score;
     private int player2Score;
     private int bestOfFrames;
+    private String player1Country;
+    private String player2Country;
+
+    public String getRound() {
+        return round;
+    }
+
+    public void setRound(String round) {
+        this.round = round;
+    }
+
+    private String round;
+
+    public String getPlayer1Country() {
+        return player1Country;
+    }
+
+    public void setPlayer1Country(String player1Country) {
+        this.player1Country = player1Country;
+    }
+
+    public String getPlayer2Country() {
+        return player2Country;
+    }
+
+    public void setPlayer2Country(String player2Country) {
+        this.player2Country = player2Country;
+    }
 
     public String getPlayer1() {
         return player1;
