@@ -7,7 +7,7 @@ import java.util.*;
 
 public class JsonProcessor {
     private Map<String, Player> players = new HashMap<>();
-    private static final double K_BASE = 32.0;
+    private static final double K_BASE = 15.0;
 
     public Map<String, Player> getPlayers() {
         return players;
@@ -74,9 +74,14 @@ public class JsonProcessor {
             // calculate expected score for player 1
             double expectedScorePlayer1 = 1.0 / (1.0 + Math.pow(10.0, (player2Points - player1Points) / 400.0));
             double expectedScorePlayer2 = 1.0 - expectedScorePlayer1;
+            int framesToWin = (bestOfFrames + 1) / 2;
+            expectedScorePlayer1 = expectedScorePlayer1 * framesToWin;
+            expectedScorePlayer2 = expectedScorePlayer2 * framesToWin;
             // actual score for player 1
-            double actualResultPlayer1 = (player1Score > player2Score) ? 1.0 : (player1Score == player2Score) ? 0.5 : 0.0;
-            double actualResultPlayer2 = 1.0 - actualResultPlayer1;
+//            double actualResultPlayer1 = (player1Score > player2Score) ? 1.0 : (player1Score == player2Score) ? 0.5 : 0.0;
+//            double actualResultPlayer2 = 1.0 - actualResultPlayer1;
+            double actualResultPlayer1 = (double)player1Score;
+            double actualResultPlayer2 = (double)player2Score;
             // scale K by best of frames
             double kScaled = K_BASE * Math.sqrt(bestOfFrames / 11.0);
             // get points change for player 1 and player 2
