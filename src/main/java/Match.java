@@ -10,6 +10,16 @@ public class Match{
     private String player1Country;
     private String player2Country;
 
+    public int getOriginalIndex() {
+        return originalIndex;
+    }
+
+    public void setOriginalIndex(int originalIndex) {
+        this.originalIndex = originalIndex;
+    }
+
+    private int originalIndex;
+
     public String getRound() {
         return round;
     }
