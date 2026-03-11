@@ -4,7 +4,7 @@ import org.apache.commons.math3.util.CombinatoricsUtils;
 import java.io.*;
 import java.util.*;
 
-public class JsonProcessor {
+public class JsonProcessorO3 {
     private Map<String, Player> players = new HashMap<>();
     private static final double K_BASE = 32.0;
     private static final double FRAME_WON_PARAMETER = 400.0;
@@ -19,28 +19,28 @@ public class JsonProcessor {
     // make a sorted list of matches by date, from oldest to newest,
     // return the list of matches
     public List<Match> readMatchesFromJson(String fileName) {
-            Gson gson = new Gson();
-            try (Reader reader = new FileReader(fileName)) {
-                Season season = gson.fromJson(reader, Season.class);
-                List<Match> matches = new ArrayList<>();
-                int index = 0;
-                for (Tournament tournament : season.getTournaments()) {
-                    for  (Match match : tournament.getMatches()) {
-                        match.setOriginalIndex(index);
-                        matches.add(match);
-                        index++;
-                    }
+        Gson gson = new Gson();
+        try (Reader reader = new FileReader(fileName)) {
+            Season season = gson.fromJson(reader, Season.class);
+            List<Match> matches = new ArrayList<>();
+            int index = 0;
+            for (Tournament tournament : season.getTournaments()) {
+                for  (Match match : tournament.getMatches()) {
+                    match.setOriginalIndex(index);
+                    matches.add(match);
+                    index++;
                 }
-                // sort matches by date, from oldest to newest
-                // if same date, maintain the reverse of original order
-                // (so that the matches in the same tournament are in the same order as in the json file)
-                matches.sort(Comparator.comparing(Match::getDate)
-                        .thenComparing(Comparator.comparingInt(Match::getOriginalIndex).reversed()));
-                return matches;
-            } catch (IOException e) {
-                e.printStackTrace();
-                return Collections.emptyList();
             }
+            // sort matches by date, from oldest to newest
+            // if same date, maintain the reverse of original order
+            // (so that the matches in the same tournament are in the same order as in the json file)
+            matches.sort(Comparator.comparing(Match::getDate)
+                    .thenComparing(Comparator.comparingInt(Match::getOriginalIndex).reversed()));
+            return matches;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return Collections.emptyList();
+        }
     }
 
     // calculate expected frames won for each player based
@@ -75,6 +75,9 @@ public class JsonProcessor {
             expectedFramesP1 += resultProb * bestOfFrames / 2;
             expectedFramesP2 += resultProb * bestOfFrames / 2;
         }
+
+        //System.out.println("Best of " + bestOfFrames + " between Player 1 (Points: " + player1Points + ") and Player 2 (Points: " + player2Points + ")");
+        //System.out.println("Expected Frames Won - Player 1: " + expectedFramesP1 + ", Player 2: " + expectedFramesP2);
 
         return Arrays.asList(expectedFramesP1, expectedFramesP2);
     }
@@ -142,13 +145,12 @@ public class JsonProcessor {
             // calculate expected score for player 1
             // 1. Calculate Single-Frame Win Probability
             // This predicts the chance of Player 1 winning any given frame
-            double expectedFrameProbP1 = 1.0 / (1.0 + Math.pow(Math.E, (player2Points - player1Points) / FRAME_WON_PARAMETER));
-            double expectedFrameProbP2 = 1.0 - expectedFrameProbP1;
+
 
             // 2. Calculate Expected Frames Won
-            int totalFramesPlayed = player1Score + player2Score;
-            double expectedFramesP1 = expectedFrameProbP1 * totalFramesPlayed;
-            double expectedFramesP2 = expectedFrameProbP2 * totalFramesPlayed;
+            List<Double> twoPlayersExpectedFrames = calculateExpectedFramesWonForTwoPlayers(bestOfFrames, player1Points, player2Points);
+            double expectedFramesP1 = twoPlayersExpectedFrames.get(0);
+            double expectedFramesP2 = twoPlayersExpectedFrames.get(1);
 
             // 3. Base Points Change (Zero-Sum)
             // Note: We don't need the Math.sqrt(bestOfFrames) scaling anymore.
@@ -175,14 +177,14 @@ public class JsonProcessor {
     }
 
     public static void main(String[] args) {
-        JsonProcessor processor = new JsonProcessor();
+        JsonProcessorO3 processor = new JsonProcessorO3();
 
         // burn in with 2022-2023 season
         List<Match> matches2022_2023 = processor.readMatchesFromJson("season_2022-2023.json");
         processor.processMatches(matches2022_2023);
         // save the players at this point into csv file "players_after_2022-2023.csv"
         // with columns "name", "country", "currentFormPoints"
-        try (Writer writer = new FileWriter("players_after_2022-2023.csv")) {
+        try (Writer writer = new FileWriter("O3players_after_2022-2023.csv")) {
             writer.write("name,country,currentFormPoints\n");
             for (Player player : processor.getPlayers().values()) {
                 writer.write(player.getName() + "," + player.getCountry() + "," + player.getCurrentFormPoints() + "\n");
@@ -237,7 +239,7 @@ public class JsonProcessor {
                 .forEach(player -> System.out.println(player.getName() + " (" + player.getCountry() + "): " + player.getCurrentFormPoints()));
 
         // write a file "players_final.csv" with columns "name", "country", "currentFormPointsAfter2022_2023", "currentFormPointsAfter2023_2024", "currentFormPointsAfter2024_2025", "currentFormPointsAfter2025_2026"
-        try (Writer writer = new FileWriter("players_final.csv")) {
+        try (Writer writer = new FileWriter("O3players_final.csv")) {
             writer.write("name,country,currentFormPointsAfter2022_2023,currentFormPointsAfter2023_2024,currentFormPointsAfter2024_2025,currentFormPointsAfter2025_2026\n");
             for (Player player : processor.getPlayers().values()) {
                 String name = player.getName();
@@ -254,7 +256,7 @@ public class JsonProcessor {
 
         // write a file to keep players' score history
         // columns are "name", "country", "date", "score"
-        try (Writer writer = new FileWriter("players_score_history.csv")) {
+        try (Writer writer = new FileWriter("O3players_score_history.csv")) {
             writer.write("name,country,date,score\n");
             for (Player player : processor.getPlayers().values()) {
                 String name = player.getName();
@@ -271,3 +273,4 @@ public class JsonProcessor {
 
     }
 }
+
