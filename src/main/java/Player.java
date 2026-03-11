@@ -6,6 +6,15 @@ public class Player{
     private String country;
     private double currentFormPoints;
     private List<ScoreDate> scoreHistory = new ArrayList<>();
+    private String lastMatchDate;
+
+    public String getLastMatchDate() {
+        return lastMatchDate;
+    }
+
+    public void setLastMatchDate(String lastMatchDate) {
+        this.lastMatchDate = lastMatchDate;
+    }
 
     public List<ScoreDate> getScoreHistory() {
         return scoreHistory;
