@@ -1,6 +1,10 @@
 import com.google.gson.Gson;
 import org.apache.commons.math3.util.CombinatoricsUtils;
 
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.time.format.DateTimeFormatter;
+
 import java.io.*;
 import java.util.*;
 
@@ -9,6 +13,9 @@ public class JsonProcessorO3 {
     private static final double K_BASE = 32.0;
     private static final double FRAME_WON_PARAMETER = 400.0;
     private static final double BREAK_MULTIPLIER = 25.0;
+    private static final int THRESHOLD_DECAY = 7;
+    private static final double FULL_DECAY_TIME = 70.0;
+    private static final double FULL_RECOVERY_TIME = 360.0;
 
     public Map<String, Player> getPlayers() {
         return players;
@@ -120,11 +127,13 @@ public class JsonProcessorO3 {
             if (!players.containsKey(player1Name)) {
                 Player player1 = new Player(player1Name, player1Country);
                 player1.addScoreDate(date, player1.getCurrentFormPoints());
+                player1.setLastMatchDate(date);
                 players.put(player1Name, player1);
             }
             if (!players.containsKey(player2Name)) {
                 Player player2 = new Player(player2Name, player2Country);
                 player2.addScoreDate(date, player2.getCurrentFormPoints());
+                player2.setLastMatchDate(date);
                 players.put(player2Name, player2);
             }
 
@@ -141,6 +150,57 @@ public class JsonProcessorO3 {
                     .count();
             int player2Breaks70Plus = (int)match.getBreaksPlayer2().stream().filter(breakScore -> breakScore >= 70)
                     .count();
+
+
+            // consider date gap decay
+            String lastMatchDate1 = player1.getLastMatchDate();
+            String lastMatchDate2 = player2.getLastMatchDate();
+
+            int daysDiff1 = (int) ChronoUnit.DAYS.between(LocalDate.parse(lastMatchDate1), LocalDate.parse(date));
+            int daysDiff2 = (int) ChronoUnit.DAYS.between(LocalDate.parse(lastMatchDate2), LocalDate.parse(date));
+            daysDiff1 = Math.max(0, daysDiff1 - THRESHOLD_DECAY);
+            daysDiff2 = Math.max(0, daysDiff2 - THRESHOLD_DECAY);
+            //System.out.println("It has been " + daysDiff1 + " from last match.");
+
+            if (daysDiff1 > 0){
+                // get previous score average
+                double prevAvg = player1.getScoreHistory().stream()
+                        .mapToDouble(ScoreDate::getScore)
+                        .average()
+                        .orElse(player1.getCurrentFormPoints());
+                //System.out.println("Previous avreage score for " + player1.getName() + ": " + prevAvg + " on date " + date);
+                // get historical maximum
+                double preMax = player1.getScoreHistory().stream()
+                        .mapToDouble(ScoreDate::getScore)
+                        .max().orElse(player1.getCurrentFormPoints());
+
+                if (player1Points < 1500 && player1Points < preMax){
+                    player1Points += (preMax - player1Points) * Math.min(0.95, daysDiff1 / FULL_RECOVERY_TIME);
+                }
+                else if (player1Points > prevAvg) {
+                    player1Points -= (player1Points - prevAvg) * Math.min(1, daysDiff1 / FULL_DECAY_TIME);
+                }
+            }
+
+            if  (daysDiff2 > 0){
+                double prevAvg = player2.getScoreHistory().stream()
+                        .mapToDouble(ScoreDate::getScore)
+                        .average()
+                        .orElse(player2.getCurrentFormPoints());
+                double preMax = player2.getScoreHistory().stream()
+                        .mapToDouble(ScoreDate::getScore)
+                        .max().orElse(player2.getCurrentFormPoints());
+                if (player2Points < 1500 && player2Points < preMax){
+                    player2Points += (preMax - player2Points) * Math.min(0.95, daysDiff2 / FULL_RECOVERY_TIME);
+                }
+                else if (player2Points > prevAvg) {
+                    player2Points -= (player2Points - prevAvg) * Math.min(1, daysDiff2 / FULL_DECAY_TIME);
+                }
+            }
+
+            // set new last match date
+            player1.setLastMatchDate(date);
+            player2.setLastMatchDate(date);
 
             // calculate expected score for player 1
             // 1. Calculate Single-Frame Win Probability
@@ -166,6 +226,7 @@ public class JsonProcessorO3 {
             // add bonus for 70+ breaks, set as 400 * count / bestOfFrames
 //            pointsChangePlayer1 += 400.0 * player1Breaks70Plus / bestOfFrames;
 //            pointsChangePlayer2 += 400.0 * player2Breaks70Plus / bestOfFrames;
+
             // update players' points
             player1.setCurrentFormPoints(player1Points + pointsChangePlayer1);
             player2.setCurrentFormPoints(player2Points + pointsChangePlayer2);
@@ -244,10 +305,10 @@ public class JsonProcessorO3 {
             for (Player player : processor.getPlayers().values()) {
                 String name = player.getName();
                 String country = player.getCountry();
-                double pointsAfter2022_2023 = playersPointsAfter2022_2023.getOrDefault(name, 0.0);
-                double pointsAfter2023_2024 = playersPointsAfter2023_2024.getOrDefault(name, 0.0);
-                double pointsAfter2024_2025 = playersPointsAfter2024_2025.getOrDefault(name, 0.0);
-                double pointsAfter2025_2026 = playersPointsAfter2025_2026.getOrDefault(name, 0.0);
+                double pointsAfter2022_2023 = playersPointsAfter2022_2023.getOrDefault(name, 1500.0);
+                double pointsAfter2023_2024 = playersPointsAfter2023_2024.getOrDefault(name, 1500.0);
+                double pointsAfter2024_2025 = playersPointsAfter2024_2025.getOrDefault(name, 1500.0);
+                double pointsAfter2025_2026 = playersPointsAfter2025_2026.getOrDefault(name, 1500.0);
                 writer.write(name + "," + country + "," + pointsAfter2022_2023 + "," + pointsAfter2023_2024 + "," + pointsAfter2024_2025 + "," + pointsAfter2025_2026 + "\n");
             }
         } catch (IOException e) {
