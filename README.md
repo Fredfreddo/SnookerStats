@@ -96,9 +96,9 @@ The main problem for Option 1 is that the number of total frames in a match is n
 
 Option3 calculates the expected number of frames won by players. For a scenario when player 1 wins k frames and player 2 wins r frames, the probability of this scenario is calculated as:
 
-$$P(F_1=k,F_2=r,k>r) = \binom{k+r-1}{r} \cdot P_{1,2}^k \cdot P_{2,1}^r$$
+$$P(F_1=k,F_2=r,k \gt r) = \binom{k+r-1}{r} \cdot P_{1,2}^k \cdot P_{2,1}^r$$
 
-$$P(F_1=k,F_2=r,k<r) = \binom{k+r-1}{k} \cdot P_{1,2}^k \cdot P_{2,1}^r$$
+$$P(F_1=k,F_2=r,k \lt r) = \binom{k+r-1}{k} \cdot P_{1,2}^k \cdot P_{2,1}^r$$
 
 Where $P_{1,2}$ and $P_{2,1}$ are the expected frame win rates for player1 and player2 respectively, calculated as in Option 1.
 
