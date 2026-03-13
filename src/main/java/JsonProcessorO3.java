@@ -14,8 +14,11 @@ public class JsonProcessorO3 {
     private static final double FRAME_WON_PARAMETER = 400.0;
     private static final double BREAK_MULTIPLIER = 25.0;
     private static final int THRESHOLD_DECAY = 7;
-    private static final double FULL_DECAY_TIME = 70.0;
-    private static final double FULL_RECOVERY_TIME = 360.0;
+    private static final double FULL_DECAY_TIME = 49.0;
+    private static final double FULL_RECOVERY_TIME = 358.0;
+
+    private static final double INITIAL_POINTS_GAP = 10.0;
+    private static final String INITIAL_DATE = "2022-06-27";
 
     public Map<String, Player> getPlayers() {
         return players;
@@ -237,8 +240,48 @@ public class JsonProcessorO3 {
         }
     }
 
+    public void initializePlayers(String fileName){
+        // read rankings_22_23.csv and initialize players with the points in the csv file
+        try (BufferedReader br = new BufferedReader(new FileReader(fileName))) {
+            String line;
+            // skip the header
+            br.readLine();
+            while ((line = br.readLine()) != null) {
+                String[] parts = line.split(",");
+                if (parts.length >= 3) {
+                    String name = parts[2].trim();
+                    String country = parts[1].trim();
+                    int ranking = Integer.parseInt(parts[0].trim().replaceAll("[^\\d-]", ""));
+
+                    double points = 1500.0 + (65.5 - ranking) * INITIAL_POINTS_GAP;
+                    Player player = new Player(name, country, points);
+                    player.addScoreDate(INITIAL_DATE, points);
+                    player.setLastMatchDate(INITIAL_DATE);
+                    players.put(name, player);
+                }
+            }
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void deleteBannedPlayers(){
+        // remove banned players
+        players.remove("Yan Bingtao");
+        players.remove("Liang Wenbo");
+        players.remove("Li Hang");
+        players.remove("Lu Ning");
+        players.remove("Zhang Jiankang");
+        players.remove("Chen Zifan");
+        players.remove("Bai Langning");
+        players.remove("Mark King");
+    }
+
     public static void main(String[] args) {
         JsonProcessorO3 processor = new JsonProcessorO3();
+
+        processor.initializePlayers("rankings_22_23.csv");
 
         // burn in with 2022-2023 season
         List<Match> matches2022_2023 = processor.readMatchesFromJson("season_2022-2023.json");
@@ -290,6 +333,7 @@ public class JsonProcessorO3 {
             playersPointsAfter2025_2026.put(player.getName(), player.getCurrentFormPoints());
         }
 
+        processor.deleteBannedPlayers();
 
         System.out.println("After processing 2025-2026 season:");
         System.out.println("There are " + processor.getPlayers().size() + " unique players in total.");

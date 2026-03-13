@@ -34,6 +34,12 @@ public class Player{
         this.currentFormPoints = 1500;
     }
 
+    public Player(String name, String country, double initialPoints){
+        this.name = name;
+        this.country = country;
+        this.currentFormPoints = initialPoints;
+    }
+
     // override equals and hashCode so that two players with the same name are considered equal
     @Override
     public boolean equals(Object o) {
